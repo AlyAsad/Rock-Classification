@@ -33,9 +33,12 @@ A project I coded while working at Aremak, Turkey.
 
 
 ## Setup photos
-![Setup Image](images/setup.HEIC)
 
+Image of the camera setup:
+![Setup Image](images/setup.jpeg)
 
+Image of the rocks used for training and testing:
+![Rocks Image](images/rock_samples.jpeg)
 
 
 
