@@ -33,7 +33,9 @@ A project I coded while working at Aremak, Turkey.
 
 
 ## Setup photos
-TODO
+![Setup Image](images/setup.HEIC)
+
+
 
 
 
