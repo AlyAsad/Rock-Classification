@@ -8,7 +8,7 @@ A project I coded while working at Aremak, Turkey.
 ## What it does
 1) Firstly, it connects to an external camera that is attached to the computer. The camera should have the rocks to classify in its view.
 
-2) Then, you can choose to train data by taking pictures of your rock samples or classify when sufficient training data has been acquired.
+2) Then, you can choose whether to use average HSV values of the selected region or histogram values of the selected region for classification (histogram will have more accuracy but higher number of features in KNN model).
 
 3) With classification, it can classify the different types of rocks by using their HSV color values.
 
@@ -18,9 +18,9 @@ A project I coded while working at Aremak, Turkey.
    
 2) Make sure the external camera is connected and setup with proper lighting/exposure.
    
-3) Run myCode.py and choose either training or classification.
+3) Run `classifyAvg.py` to classify using average values, or `classifyHistogram.py` to classify using a histogram of the region.
 
-4) A window will pop up, you can click on the region which you want to scan for training/classification.
+4) A window will pop up, you can click on the region which you want to scan for classification, and it will give the prediction.
 
 
 ## Equipment/Technologies used:
