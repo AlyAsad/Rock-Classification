@@ -129,7 +129,7 @@ def mouse_callback(event, x, y, flags, param):
 
 def saveToCSV(value, label):
     
-    with open("helperFiles/rock_data_KNN.csv", mode = "a", newline = "") as file:
+    with open("helperFiles/rock_data_Avg.csv", mode = "a", newline = "") as file:
         writer = csv.writer(file)
         writer.writerow([value[0], value[1], value[2], label])
     
@@ -209,7 +209,7 @@ def showWithClassification(cv_image):
         
         labels_dict = {1: "White rock", 2: "Orange rock", 3: "Black rock"}
         rockName = labels_dict[predicted]
-        cv2.putText(cv_image, f"Predicted: {predicted}) {rockName}", (coordsX - 80, coordsY - 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        cv2.putText(cv_image, f"Predicted: {predicted}) {rockName}", (coordsX - 100, coordsY - 70), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
         
     cv2.imshow("Click on object for classification", cv_image) 
     cv2.setMouseCallback("Click on object for classification", mouse_callback, param=cv_image)
@@ -243,9 +243,6 @@ def showWithClassification(cv_image):
     
     predicted = knn.predict(data)[0]
     
-    # display classified data
-    print(f"\nPredicted label: {predicted}) {rockName}")
-    
     
     
         
@@ -257,7 +254,7 @@ def trainKNNModel():
     
     global scaler, knn
     
-    data = pd.read_csv("helperFiles/rock_data_KNN.csv", header = None)
+    data = pd.read_csv("helperFiles/rock_data_Avg.csv", header = None)
     X = data.iloc[:, :3].values # first 3 columns are features
     y = data.iloc[:, 3].values # last column is labels
     
@@ -272,8 +269,11 @@ def trainKNNModel():
 
 
 
+choice = "1"
+#UNCOMMENT THE BELOW LINE IF YOU WANT TO ASK FOR TRAINING
+#choice = input("Do you want to [0] train or [1] classify: ")
 
-choice = input("Do you want to [0] train or [1] classify: ")
+
 
 # training the model if classification selected
 if choice == "1":
