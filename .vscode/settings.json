@@ -1,5 +1,6 @@
 {
     "python.analysis.extraPaths": [
-        "./MvImport"
+        "./MvImport",
+        "./helperFiles/MvImport"
     ]
 }

@@ -8,7 +8,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
 
 
-sys.path.append("MvImport")
+sys.path.append("helperFiles/MvImport")
 from MvCameraControl_class import *
 
 
@@ -129,7 +129,7 @@ def mouse_callback(event, x, y, flags, param):
 
 def saveToCSV(value, label):
     
-    with open("rock_data.csv", mode = "a", newline = "") as file:
+    with open("helperFiles/rock_data_KNN.csv", mode = "a", newline = "") as file:
         writer = csv.writer(file)
         writer.writerow([value[0], value[1], value[2], label])
     
@@ -257,7 +257,7 @@ def trainKNNModel():
     
     global scaler, knn
     
-    data = pd.read_csv("rock_data.csv", header = None)
+    data = pd.read_csv("helperFiles/rock_data_KNN.csv", header = None)
     X = data.iloc[:, :3].values # first 3 columns are features
     y = data.iloc[:, 3].values # last column is labels
     
