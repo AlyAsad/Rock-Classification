@@ -9,6 +9,7 @@ from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+import math
 
 sys.path.append("helperFiles/MvImport")
 from MvCameraControl_class import *
@@ -17,6 +18,7 @@ from MvCameraControl_class import *
 
 ### GLOBAL VARIABLES
 background = None
+object_colors = {}
 
 scaler = StandardScaler()
 knn = KNeighborsClassifier(n_neighbors = 3) # using 3 neighbours
@@ -235,33 +237,73 @@ def classify_object(image):
     return label
 
 
+
+def euclidean_distance(p1, p2):
+    return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+
+
+
 def showWithClassification(frame):
     """
     Applies background subtraction, detects contours, classifies the detected objects,
-    and displays the results.
+    and displays the results with consistent colors.
     """
+    global object_colors
     
     mask = apply_background_subtraction(frame)
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    min_contour_area = cv2.getTrackbarPos("Contour", "Trackbars")
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
     
-    for contour in contours:
-        if cv2.contourArea(contour) > min_contour_area:
-            x, y, w, h = cv2.boundingRect(contour)
+    colored_mask = np.zeros((*mask.shape, 3), dtype=np.uint8)
+    min_area = cv2.getTrackbarPos("Area", "Trackbars")
+    
+    updated_colors = {}
+
+    for i in range(1, num_labels):  # skipping background label (0)
+        if stats[i, cv2.CC_STAT_AREA] > min_area:
+            x, y, w, h, area = stats[i]
+            cx, cy = centroids[i]
+
             roi = frame[y:y + h, x:x + w]
 
             # classify the extracted region
             label = classify_object(roi)
 
-            # draw bounding box and classification result
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.putText(frame, f"Rock type: {label}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 
-                        0.6, (0, 255, 0), 2)
+            # try to match this object with a previously seen object
+            closest_key = None
+            min_distance = float("inf")
+            threshold_distance = 30  # max distance to be considered the same object
+
+            for prev_key in object_colors.keys():
+                prev_cx, prev_cy, prev_label = prev_key
+                distance = euclidean_distance((cx, cy), (prev_cx, prev_cy))
+                
+                if distance < min_distance and prev_label == label:
+                    min_distance = distance
+                    closest_key = prev_key
+
+            # Assign or reuse color
+            if closest_key and min_distance < threshold_distance:
+                color = object_colors[closest_key]  # reuse previous color
+                updated_colors[(cx, cy, label)] = color  # update tracking dictionary
+            else:
+                color = tuple(np.random.randint(0, 255, size=3, dtype=np.uint8))  # new color
+                updated_colors[(cx, cy, label)] = color  # store for next frame
+
+            # assign the color to the component
+            colored_mask[labels == i] = color
+
+            # draw classification label
+            cv2.putText(colored_mask, f"Rock type: {label}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6, (255, 255, 255), 2)
+
+            # draw bounding box with proper color format
+            cv2.rectangle(colored_mask, (x, y), (x + w, y + h), tuple(map(int, color)), 2)
+
+    # update global dictionary for tracking across frames
+    object_colors = updated_colors.copy()
 
     cv2.namedWindow("Final", cv2.WINDOW_NORMAL)
-    cv2.imshow("Final", frame)
-
+    cv2.imshow("Final", colored_mask)
 
 
 
@@ -278,7 +320,7 @@ trainModel()
 cv2.namedWindow("Trackbars", cv2.WINDOW_NORMAL)
 cv2.createTrackbar("Threshold", "Trackbars", 50, 255, lambda x : None)
 cv2.createTrackbar("Kernel", "Trackbars", 5, 20, lambda x : None)
-cv2.createTrackbar("Contour", "Trackbars", 500, 5000, lambda x : None)
+cv2.createTrackbar("Area", "Trackbars", 500, 100000, lambda x : None)
 
 
 # main loop
