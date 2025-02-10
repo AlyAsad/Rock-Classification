@@ -64,8 +64,8 @@ if ret != 0:
     sys.exit()
 
 # Set Camera Parameters
-cam.MV_CC_SetFloatValue("ExposureTime", 20000.0)  # set exposure time
-cam.MV_CC_SetEnumValue("GainAuto", 1)  # enable auto gain
+cam.MV_CC_SetFloatValue("ExposureTime", 60000.0)  # set exposure time
+cam.MV_CC_SetEnumValue("GainAuto", 0)  # disable auto gain
 
 # Start Grabbing
 ret = cam.MV_CC_StartGrabbing()
@@ -200,7 +200,8 @@ def apply_background_subtraction(frame):
     cv2.imshow("After thresholding", thresh)
 
     # applying morphological operations to remove noise
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+    kernel = np.ones((kernel_size, kernel_size), np.uint8) 
     clean_mask = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
     clean_mask = cv2.morphologyEx(clean_mask, cv2.MORPH_OPEN, kernel)
     
@@ -210,27 +211,56 @@ def apply_background_subtraction(frame):
     return clean_mask
 
 
+    
+def classify_object(image):
+    """
+    Classifies a detected object using the trained KNN model.
+    """
+    global scaler, knn
+
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+    # compute color histograms for H, S, and V channels
+    h_hist = cv2.calcHist([hsv_image], [0], None, [180], [0, 256]).flatten()
+    s_hist = cv2.calcHist([hsv_image], [1], None, [256], [0, 256]).flatten()
+    v_hist = cv2.calcHist([hsv_image], [2], None, [256], [0, 256]).flatten()
+
+    # flatten histograms and normalize
+    features = np.concatenate((h_hist, s_hist, v_hist)).reshape(1, -1)
+    features = scaler.transform(features)
+
+    # predict using KNN
+    label = knn.predict(features)[0]
+
+    return label
 
 
 def showWithClassification(frame):
+    """
+    Applies background subtraction, detects contours, classifies the detected objects,
+    and displays the results.
+    """
     
     mask = apply_background_subtraction(frame)
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    min_contour_area = cv2.getTrackbarPos("Contour", "Trackbars")
 
+    min_contour_area = cv2.getTrackbarPos("Contour", "Trackbars")
+    
     for contour in contours:
-        if cv2.contourArea(contour) > min_contour_area:  # ignore small noise
+        if cv2.contourArea(contour) > min_contour_area:
             x, y, w, h = cv2.boundingRect(contour)
+            roi = frame[y:y + h, x:x + w]
+
+            # classify the extracted region
+            label = classify_object(roi)
+
+            # draw bounding box and classification result
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    
-    
+            cv2.putText(frame, f"Rock type: {label}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.6, (0, 255, 0), 2)
+
     cv2.namedWindow("Final", cv2.WINDOW_NORMAL)
     cv2.imshow("Final", frame)
-
-    
-    
-    
 
 
 

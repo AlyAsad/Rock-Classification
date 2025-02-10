@@ -67,8 +67,8 @@ if ret != 0:
     sys.exit()
 
 # Set Camera Parameters
-cam.MV_CC_SetFloatValue("ExposureTime", 20000.0)  # set exposure time
-cam.MV_CC_SetEnumValue("GainAuto", 1)  # enable auto gain
+cam.MV_CC_SetFloatValue("ExposureTime", 60000.0)  # set exposure time
+cam.MV_CC_SetEnumValue("GainAuto", 0)  # disable auto gain
 
 # Start Grabbing
 ret = cam.MV_CC_StartGrabbing()
