@@ -176,12 +176,23 @@ def trainModel():
     
 
 
-def capture_background():
+def load_background():
     global background
-    print("Capturing background, please ensure no objects are in view...")
-    background = getOpenCVImage()
-    print("Background captured.")
+    background = cv2.imread("images/background.png")
+    print("Background loaded.")
 
+def capture_background():
+    
+    global background
+    print("Capturing background, please ensure no objects are in view.")
+    
+    background = getOpenCVImage()
+    
+    cv2.imwrite("images/background.png", background)
+    
+    
+    
+    
 
 
 def apply_background_subtraction(frame):
@@ -214,7 +225,7 @@ def apply_background_subtraction(frame):
 
 
     
-def classify_object(image):
+def classify_object(image, mask):
     """
     Classifies a detected object using the trained KNN model.
     """
@@ -223,9 +234,9 @@ def classify_object(image):
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
     # compute color histograms for H, S, and V channels
-    h_hist = cv2.calcHist([hsv_image], [0], None, [180], [0, 256]).flatten()
-    s_hist = cv2.calcHist([hsv_image], [1], None, [256], [0, 256]).flatten()
-    v_hist = cv2.calcHist([hsv_image], [2], None, [256], [0, 256]).flatten()
+    h_hist = cv2.calcHist([hsv_image], [0], mask, [180], [0, 256]).flatten()
+    s_hist = cv2.calcHist([hsv_image], [1], mask, [256], [0, 256]).flatten()
+    v_hist = cv2.calcHist([hsv_image], [2], mask, [256], [0, 256]).flatten()
 
     # flatten histograms and normalize
     features = np.concatenate((h_hist, s_hist, v_hist)).reshape(1, -1)
@@ -246,7 +257,7 @@ def euclidean_distance(p1, p2):
 def showWithClassification(frame):
     """
     Applies background subtraction, detects contours, classifies the detected objects,
-    and displays the results with consistent colors.
+    and displays the results with consistent colors **only on detected pixels.**
     """
     global object_colors
     
@@ -260,13 +271,13 @@ def showWithClassification(frame):
 
     for i in range(1, num_labels):  # skipping background label (0)
         if stats[i, cv2.CC_STAT_AREA] > min_area:
-            x, y, w, h, area = stats[i]
             cx, cy = centroids[i]
 
-            roi = frame[y:y + h, x:x + w]
+            # create a mask for the current object
+            object_mask = (labels == i).astype(np.uint8) * 255
 
-            # classify the extracted region
-            label = classify_object(roi)
+            # classify the detected pixels only
+            label = classify_object(frame, object_mask)
 
             # try to match this object with a previously seen object
             closest_key = None
@@ -281,7 +292,7 @@ def showWithClassification(frame):
                     min_distance = distance
                     closest_key = prev_key
 
-            # Assign or reuse color
+            # assign or reuse color
             if closest_key and min_distance < threshold_distance:
                 color = object_colors[closest_key]  # reuse previous color
                 updated_colors[(cx, cy, label)] = color  # update tracking dictionary
@@ -292,18 +303,16 @@ def showWithClassification(frame):
             # assign the color to the component
             colored_mask[labels == i] = color
 
-            # draw classification label
-            cv2.putText(colored_mask, f"Rock type: {label}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6, (255, 255, 255), 2)
+            # draw classification label near the detected region
+            cv2.putText(colored_mask, f"Rock type: {label}", (int(cx), int(cy)), cv2.FONT_HERSHEY_SIMPLEX,
+                        1.5, (255, 255, 255), 2)
 
-            # draw bounding box with proper color format
-            cv2.rectangle(colored_mask, (x, y), (x + w, y + h), tuple(map(int, color)), 2)
-
-    # update global dictionary for tracking across frames
+    # Update global dictionary for tracking across frames
     object_colors = updated_colors.copy()
 
     cv2.namedWindow("Final", cv2.WINDOW_NORMAL)
     cv2.imshow("Final", colored_mask)
+
 
 
 
@@ -312,19 +321,18 @@ def showWithClassification(frame):
 
 
 
-
-
-capture_background()
+load_background()
 trainModel()
 
 cv2.namedWindow("Trackbars", cv2.WINDOW_NORMAL)
-cv2.createTrackbar("Threshold", "Trackbars", 50, 255, lambda x : None)
+cv2.createTrackbar("Threshold", "Trackbars", 10, 255, lambda x : None)
 cv2.createTrackbar("Kernel", "Trackbars", 5, 20, lambda x : None)
-cv2.createTrackbar("Area", "Trackbars", 500, 100000, lambda x : None)
+cv2.createTrackbar("Area", "Trackbars", 5000, 100000, lambda x : None)
 
 
 # main loop
 while True:
+    
     
     # getting the image from camera
     cv_image = getOpenCVImage()
@@ -332,8 +340,16 @@ while True:
     # classifying
     showWithClassification(cv_image)
     
+    key = cv2.waitKey(1)
+    
+    # press 1 to take background image again
+    if key == ord("1"):
+        capture_background()
+        
+        
+        
     # press ESC to exit
-    if cv2.waitKey(1) == 27:
+    if key == 27:
         break
 
 
