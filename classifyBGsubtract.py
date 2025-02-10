@@ -16,13 +16,10 @@ from MvCameraControl_class import *
 
 
 ### GLOBAL VARIABLES
-coordsX, coordsY = 0.0, 0.0
-pressedMouse = False
-rectCoords = [[0, 0], [0, 0]]
+background = None
 
 scaler = StandardScaler()
 knn = KNeighborsClassifier(n_neighbors = 3) # using 3 neighbours
-predicted = -1
 
 
 
@@ -177,60 +174,62 @@ def trainModel():
     
 
 
+def capture_background():
+    global background
+    print("Capturing background, please ensure no objects are in view...")
+    background = getOpenCVImage()
+    print("Background captured.")
 
 
 
-def showWithClassification(cv_image):
+def apply_background_subtraction(frame):
+    global background
     
-    global coordsX, coordsY, pressedMouse, rectCoords
-    global scaler, knn, predicted
-    
-    if (predicted != -1):
-        cv2.rectangle(cv_image, (rectCoords[0][0], rectCoords[1][0]), (rectCoords[0][1], rectCoords[1][1]), (255, 0, 255), 2)
-        
-        labels_dict = {1: "White rock", 2: "Orange rock", 3: "Black rock"}
-        rockName = labels_dict[predicted]
-        cv2.putText(cv_image, f"Predicted: {predicted}) {rockName}", (coordsX - 100, coordsY - 70), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
-    
-    cv2.imshow("Click on object for classification", cv_image) 
-    cv2.setMouseCallback("Click on object for classification", mouse_callback, param=cv_image)
-    
-    # if mouse pressed, get details
-    if pressedMouse == False:
-        return
-    
-    # else pressedMouse == True
-    pressedMouse = False
-    
-    ## getting histogram of HSV
-    
-    h, w, _ = cv_image.shape
-    half_window = 50  # distance from clicked pixel, increasing will increase number of pixels checked
-    
-    rectCoords[0][0] = max(coordsX - half_window, 0) # x start
-    rectCoords[0][1] = min(coordsX + half_window, w - 1) # x end
-    rectCoords[1][0] = max(coordsY - half_window, 0) # y start
-    rectCoords[1][1] = min(coordsY + half_window, h - 1) # y end
+    threshold_value = cv2.getTrackbarPos("Threshold", "Trackbars")
+    kernel_size = cv2.getTrackbarPos("Kernel", "Trackbars")
 
-    # extract the region's colors
-    region = cv_image[rectCoords[1][0]:rectCoords[1][1], rectCoords[0][0]:rectCoords[0][1]]
+    # converting to gray for better accuracy
+    gray_background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    fg_mask = cv2.absdiff(gray_background, gray_frame)
     
-    #region to HSV
-    hsv_region = cv2.cvtColor(region, cv2.COLOR_BGR2HSV)
+    _, thresh = cv2.threshold(fg_mask, threshold_value, 255, cv2.THRESH_BINARY)
     
-    # compute histogram features
-    h_hist = cv2.calcHist([hsv_region], [0], None, [180], [0, 256]).flatten()
-    s_hist = cv2.calcHist([hsv_region], [1], None, [256], [0, 256]).flatten()
-    v_hist = cv2.calcHist([hsv_region], [2], None, [256], [0, 256]).flatten()
+    cv2.namedWindow("After thresholding", cv2.WINDOW_NORMAL)
+    cv2.imshow("After thresholding", thresh)
 
-    # flatten
-    features = np.concatenate((h_hist, s_hist, v_hist)).reshape(1, -1)
+    # applying morphological operations to remove noise
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+    clean_mask = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+    clean_mask = cv2.morphologyEx(clean_mask, cv2.MORPH_OPEN, kernel)
+    
+    cv2.namedWindow("After morph", cv2.WINDOW_NORMAL)
+    cv2.imshow("After morph", clean_mask)
 
-    # normalize
-    features = scaler.transform(features)
+    return clean_mask
 
-    # predict
-    predicted = knn.predict(features)[0]
+
+
+
+def showWithClassification(frame):
+    
+    mask = apply_background_subtraction(frame)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    min_contour_area = cv2.getTrackbarPos("Contour", "Trackbars")
+
+    for contour in contours:
+        if cv2.contourArea(contour) > min_contour_area:  # ignore small noise
+            x, y, w, h = cv2.boundingRect(contour)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+    
+    
+    cv2.namedWindow("Final", cv2.WINDOW_NORMAL)
+    cv2.imshow("Final", frame)
+
+    
+    
     
 
 
@@ -243,7 +242,14 @@ def showWithClassification(cv_image):
 
 
 
+capture_background()
 trainModel()
+
+cv2.namedWindow("Trackbars", cv2.WINDOW_NORMAL)
+cv2.createTrackbar("Threshold", "Trackbars", 50, 255, lambda x : None)
+cv2.createTrackbar("Kernel", "Trackbars", 5, 20, lambda x : None)
+cv2.createTrackbar("Contour", "Trackbars", 500, 5000, lambda x : None)
+
 
 # main loop
 while True:
